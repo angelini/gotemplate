@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"time"
 
 	pb "github.com/angelini/gotemplate/proto"
 
@@ -33,7 +34,30 @@ func (s *appServer) Test(ctx context.Context, in *pb.TestRequest) (*pb.TestRespo
 	return &pb.TestResponse{Data: 42}, nil
 }
 
+func (s *appServer) healthMonitor(ctx context.Context, healthServer *health.Server) {
+	ticker := time.NewTicker(time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				healthServer.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_NOT_SERVING)
+			case <-ticker.C:
+				status := healthpb.HealthCheckResponse_SERVING
+				err := s.pool.Ping(ctx)
+				if err != nil {
+					status = healthpb.HealthCheckResponse_NOT_SERVING
+				}
+				s.log.Info("updating status", zap.Any("status", status))
+				healthServer.SetServingStatus("gotemplate.server.Example", status)
+			}
+		}
+	}()
+}
+
 func main() {
+	rootCtx := context.Background()
+
 	log, _ := zap.NewDevelopment()
 	defer log.Sync()
 
@@ -57,7 +81,7 @@ func main() {
 	)
 
 	dbUri := os.Getenv("DB_URI")
-	pool, err := pgxpool.Connect(context.Background(), dbUri)
+	pool, err := pgxpool.Connect(rootCtx, dbUri)
 	if err != nil {
 		log.Fatal("cannot connect to DB", zap.String("uri", dbUri))
 	}
@@ -67,15 +91,16 @@ func main() {
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 
-	log.Info("register StatusServer")
-	pb.RegisterExampleServer(grpcServer, &appServer{
+	log.Info("register ExampleServer")
+	app := &appServer{
 		log:  log,
 		pool: pool,
-	})
-	healthServer.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_SERVING)
+	}
+	pb.RegisterExampleServer(grpcServer, app)
+	app.healthMonitor(rootCtx, healthServer)
 
 	log.Info("start server", zap.String("port", port))
 	if err := grpcServer.Serve(listen); err != nil {
-		log.Fatal("failed to server StatusServer", zap.Error(err))
+		log.Fatal("failed to serve", zap.Error(err))
 	}
 }
