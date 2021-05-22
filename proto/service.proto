@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/angelini/gotemplate/proto";
+
+service Status {
+    rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    rpc DbStatus (StatusRequest) returns (StatusResponse) {}
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    bool up = 1;
+}
