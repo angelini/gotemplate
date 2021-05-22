@@ -24,20 +24,14 @@ func main() {
 	}
 	defer conn.Close()
 
-	c := pb.NewStatusClient(conn)
+	c := pb.NewExampleClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	r, err := c.Status(ctx, &pb.StatusRequest{})
+	r, err := c.Test(ctx, &pb.TestRequest{})
 	if err != nil {
 		logger.Fatal("could not get status", zap.Error(err))
 	}
-	logger.Info("status", zap.Bool("up", r.GetUp()))
-
-	r, err = c.DbStatus(ctx, &pb.StatusRequest{})
-	if err != nil {
-		logger.Fatal("could not get db-status", zap.Error(err))
-	}
-	logger.Info("db-status", zap.Bool("up", r.GetUp()))
+	logger.Info("data", zap.Int64("value", r.GetData()))
 }

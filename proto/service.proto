@@ -4,14 +4,12 @@ package proto;
 
 option go_package = "github.com/angelini/gotemplate/proto";
 
-service Status {
-    rpc Status(StatusRequest) returns (StatusResponse) {}
-
-    rpc DbStatus (StatusRequest) returns (StatusResponse) {}
+service Example {
+    rpc Test(TestRequest) returns (TestResponse) {}
 }
 
-message StatusRequest {}
+message TestRequest {}
 
-message StatusResponse {
-    bool up = 1;
+message TestResponse {
+    int64 data = 1;
 }

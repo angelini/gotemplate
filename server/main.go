@@ -13,6 +13,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type MissingConfigError struct{}
@@ -21,24 +23,14 @@ func (e *MissingConfigError) Error() string {
 	return "missing config in the request context"
 }
 
-type server struct {
-	pb.UnimplementedStatusServer
+type appServer struct {
+	pb.UnimplementedExampleServer
 	log  *zap.Logger
 	pool *pgxpool.Pool
 }
 
-func (s *server) Status(ctx context.Context, in *pb.StatusRequest) (*pb.StatusResponse, error) {
-	return &pb.StatusResponse{Up: true}, nil
-}
-
-func (s *server) DbStatus(ctx context.Context, in *pb.StatusRequest) (*pb.StatusResponse, error) {
-	conn, err := s.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
-
-	return &pb.StatusResponse{Up: true}, nil
+func (s *appServer) Test(ctx context.Context, in *pb.TestRequest) (*pb.TestResponse, error) {
+	return &pb.TestResponse{Data: 42}, nil
 }
 
 func main() {
@@ -71,11 +63,18 @@ func main() {
 	}
 	defer pool.Close()
 
-	log.Info("registering StatusServer", zap.String("port", port))
-	pb.RegisterStatusServer(grpcServer, &server{
+	log.Info("register HealthServer")
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthServer)
+
+	log.Info("register StatusServer")
+	pb.RegisterExampleServer(grpcServer, &appServer{
 		log:  log,
 		pool: pool,
 	})
+	healthServer.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_SERVING)
+
+	log.Info("start server", zap.String("port", port))
 	if err := grpcServer.Serve(listen); err != nil {
 		log.Fatal("failed to server StatusServer", zap.Error(err))
 	}
