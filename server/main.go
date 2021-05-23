@@ -48,7 +48,6 @@ func (s *appServer) healthMonitor(ctx context.Context, healthServer *health.Serv
 				if err != nil {
 					status = healthpb.HealthCheckResponse_NOT_SERVING
 				}
-				s.log.Info("updating status", zap.Any("status", status))
 				healthServer.SetServingStatus("gotemplate.server.Example", status)
 			}
 		}

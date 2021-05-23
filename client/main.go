@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"time"
 
 	pb "github.com/angelini/gotemplate/proto"
@@ -10,23 +11,24 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	address = "localhost:5051"
-)
-
 func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	server := os.Getenv("SERVER")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, server, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		logger.Fatal("could not connect to server", zap.String("address", address))
+		logger.Fatal("could not connect to server", zap.String("address", server))
 	}
 	defer conn.Close()
 
 	c := pb.NewExampleClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	r, err := c.Test(ctx, &pb.TestRequest{})
