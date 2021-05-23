@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "github.com/angelini/gotemplate/pkg/pb";
+
+service Example {
+    rpc Static(ExampleRequest) returns (ExampleResponse) {}
+
+    rpc FromDb(ExampleRequest) returns (ExampleResponse) {}
+}
+
+message ExampleRequest {}
+
+message ExampleResponse {
+    int64 data = 1;
+}
