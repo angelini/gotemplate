@@ -5,13 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	pb "github.com/angelini/gotemplate/pkg/pb"
-	"github.com/jackc/pgx/v4"
+	"github.com/angelini/gotemplate/pkg/pb"
 )
-
-type DbConnector interface {
-	Connect(context.Context) (*pgx.Conn, func(), error)
-}
 
 type Example struct {
 	pb.UnimplementedExampleServer

@@ -15,7 +15,7 @@ type DbTestConnector struct {
 	dbUri string
 }
 
-func (d *DbTestConnector) Connect(ctx context.Context) (*pgx.Conn, func(), error) {
+func (d *DbTestConnector) Connect(ctx context.Context) (*pgx.Conn, api.CancelFunc, error) {
 	conn, err := pgx.Connect(ctx, d.dbUri)
 	if err != nil {
 		return nil, nil, err
@@ -26,7 +26,7 @@ func (d *DbTestConnector) Connect(ctx context.Context) (*pgx.Conn, func(), error
 		return nil, nil, err
 	}
 
-	return conn, func() { tx.Rollback(ctx) }, nil
+	return conn, func() { tx.Rollback(ctx); conn.Close(ctx) }, nil
 }
 
 var (
