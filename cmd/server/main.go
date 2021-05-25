@@ -9,8 +9,21 @@ import (
 
 	"github.com/angelini/gotemplate/pkg/api"
 	"github.com/angelini/gotemplate/pkg/server"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
+
+type DbPoolConnector struct {
+	pool *pgxpool.Pool
+}
+
+func (d *DbPoolConnector) Connect(ctx context.Context) (*pgx.Conn, func(), error) {
+	conn, err := d.pool.Acquire(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return conn.Conn(), func() { conn.Release() }, nil
+}
 
 func main() {
 	ctx := context.Background()
@@ -37,11 +50,12 @@ func main() {
 	defer pool.Close()
 
 	s := server.NewServer(log)
+	s.MonitorDbPool(ctx, pool)
 
 	log.Info("register Example")
 	example := &api.Example{
-		Log:  log,
-		Pool: pool,
+		Log:    log,
+		DbConn: &DbPoolConnector{pool: pool},
 	}
 	s.RegisterExample(ctx, example)
 

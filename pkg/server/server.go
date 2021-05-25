@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/angelini/gotemplate/pkg/api"
 	"github.com/angelini/gotemplate/pkg/pb"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -16,6 +18,7 @@ import (
 )
 
 type Server struct {
+	log    *zap.Logger
 	Grpc   *grpc.Server
 	Health *health.Server
 }
@@ -34,12 +37,35 @@ func NewServer(log *zap.Logger) *Server {
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 
-	return &Server{Grpc: grpcServer, Health: healthServer}
+	return &Server{log: log, Grpc: grpcServer, Health: healthServer}
+}
+
+func (s *Server) MonitorDbPool(ctx context.Context, pool *pgxpool.Pool) {
+	ticker := time.NewTicker(time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				s.Health.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_NOT_SERVING)
+			case <-ticker.C:
+				ctxTimeout, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
+
+				status := healthpb.HealthCheckResponse_SERVING
+				err := pool.Ping(ctxTimeout)
+				if err != nil {
+					status = healthpb.HealthCheckResponse_NOT_SERVING
+				}
+				cancel()
+
+				s.Health.SetServingStatus("gotemplate.server.Example", status)
+			}
+		}
+	}()
 }
 
 func (s *Server) RegisterExample(ctx context.Context, example *api.Example) {
 	pb.RegisterExampleServer(s.Grpc, example)
-	example.HealthMonitor(ctx, s.Health)
 }
 
 func (s *Server) Serve(lis net.Listener) error {

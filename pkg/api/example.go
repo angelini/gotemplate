@@ -2,21 +2,22 @@ package api
 
 import (
 	"context"
-	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/health"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	pb "github.com/angelini/gotemplate/pkg/pb"
+	"github.com/jackc/pgx/v4"
 )
+
+type DbConnector interface {
+	Connect(context.Context) (*pgx.Conn, func(), error)
+}
 
 type Example struct {
 	pb.UnimplementedExampleServer
 
-	Log  *zap.Logger
-	Pool *pgxpool.Pool
+	Log    *zap.Logger
+	DbConn DbConnector
 }
 
 func (e *Example) Static(ctx context.Context, in *pb.ExampleRequest) (*pb.ExampleResponse, error) {
@@ -24,11 +25,11 @@ func (e *Example) Static(ctx context.Context, in *pb.ExampleRequest) (*pb.Exampl
 }
 
 func (e *Example) FromDb(ctx context.Context, in *pb.ExampleRequest) (*pb.ExampleResponse, error) {
-	conn, err := e.Pool.Acquire(ctx)
+	conn, cancel, err := e.DbConn.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Release()
+	defer cancel()
 
 	rows, err := conn.Query(ctx, "SELECT count(*) FROM information_schema.schemata;")
 	if err != nil {
@@ -43,24 +44,4 @@ func (e *Example) FromDb(ctx context.Context, in *pb.ExampleRequest) (*pb.Exampl
 	}
 
 	return &pb.ExampleResponse{Data: values[0].(int64)}, nil
-}
-
-func (e *Example) HealthMonitor(ctx context.Context, healthServer *health.Server) {
-	ticker := time.NewTicker(time.Second)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				healthServer.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_NOT_SERVING)
-			case <-ticker.C:
-				status := healthpb.HealthCheckResponse_SERVING
-				err := e.Pool.Ping(ctx)
-				if err != nil {
-					status = healthpb.HealthCheckResponse_NOT_SERVING
-				}
-				healthServer.SetServingStatus("gotemplate.server.Example", status)
-			}
-		}
-	}()
 }

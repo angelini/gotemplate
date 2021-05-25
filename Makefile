@@ -1,11 +1,15 @@
 PG_HOST := 10.1.1.3
 
-.PHONY: install build server client health
+.PHONY: install test build server client health
 
 install:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	go install github.com/grpc-ecosystem/grpc-health-probe
+
+test: export DB_URI=postgres://postgres@$(PG_HOST):5432/postgres
+test:
+	cd test && go test
 
 pkg/pb/%.pb.go: pkg/pb/%.proto
 	protoc --go_out=. --go_opt=paths=source_relative $^
