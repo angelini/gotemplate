@@ -17,6 +17,7 @@ $ make install
 
 ```
 $ make build
+$ make migrate
 ```
 
 ## Local

@@ -26,7 +26,7 @@ func (e *Example) FromDb(ctx context.Context, in *pb.ExampleRequest) (*pb.Exampl
 	}
 	defer cancel()
 
-	rows, err := conn.Query(ctx, "SELECT count(*) FROM information_schema.schemata;")
+	rows, err := conn.Query(ctx, "SELECT count(*) FROM example.t1;")
 	if err != nil {
 		return nil, err
 	}

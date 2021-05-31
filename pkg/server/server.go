@@ -47,7 +47,7 @@ func (s *Server) MonitorDbPool(ctx context.Context, pool *pgxpool.Pool) {
 		for {
 			select {
 			case <-ctx.Done():
-				s.Health.SetServingStatus("gotemplate.server.Example", healthpb.HealthCheckResponse_NOT_SERVING)
+				s.Health.SetServingStatus("gotemplate.server", healthpb.HealthCheckResponse_NOT_SERVING)
 			case <-ticker.C:
 				ctxTimeout, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
 
@@ -58,7 +58,7 @@ func (s *Server) MonitorDbPool(ctx context.Context, pool *pgxpool.Pool) {
 				}
 				cancel()
 
-				s.Health.SetServingStatus("gotemplate.server.Example", status)
+				s.Health.SetServingStatus("gotemplate.server", status)
 			}
 		}
 	}()

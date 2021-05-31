@@ -1,46 +1,42 @@
 package test
 
 import (
-	"context"
-	"os"
 	"testing"
 
+	utils "github.com/angelini/gotemplate/internal/testutil"
 	"github.com/angelini/gotemplate/pkg/api"
 	"github.com/angelini/gotemplate/pkg/pb"
-	"github.com/jackc/pgx/v4"
+
 	"go.uber.org/zap"
 )
 
-type DbTestConnector struct {
-	dbUri string
-}
+func writeT1(tc *utils.TestCtx, id int32, value string) {
+	conn := tc.Connect()
 
-func (d *DbTestConnector) Connect(ctx context.Context) (*pgx.Conn, api.CancelFunc, error) {
-	conn, err := pgx.Connect(ctx, d.dbUri)
+	_, err := conn.Exec(tc.Context(), `
+		INSERT INTO example.t1 (id, val)
+		VALUES ($1, $2)
+		`, id, value)
+
 	if err != nil {
-		return nil, nil, err
+		tc.Errorf("error inserting into t1: %w", err)
 	}
-
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return conn, func() { tx.Rollback(ctx); conn.Close(ctx) }, nil
 }
 
 var (
 	log, _ = zap.NewDevelopment()
-	dbConn = &DbTestConnector{dbUri: os.Getenv("DB_URI")}
 )
 
 func TestStatic(t *testing.T) {
+	tc := utils.NewTestCtx(t)
+	defer tc.Close()
+
 	a := api.Example{
 		Log:    log,
-		DbConn: dbConn,
+		DbConn: tc.Connector(),
 	}
 
-	response, err := a.Static(context.Background(), &pb.ExampleRequest{})
+	response, err := a.Static(tc.Context(), &pb.ExampleRequest{})
 	if err != nil {
 		t.Errorf("%s", err)
 	}
@@ -52,18 +48,24 @@ func TestStatic(t *testing.T) {
 }
 
 func TestFromDb(t *testing.T) {
+	tc := utils.NewTestCtx(t)
+	defer tc.Close()
+
 	a := api.Example{
 		Log:    log,
-		DbConn: dbConn,
+		DbConn: tc.Connector(),
 	}
 
-	response, err := a.FromDb(context.Background(), &pb.ExampleRequest{})
+	writeT1(&tc, 1, "foo")
+	writeT1(&tc, 2, "bar")
+
+	response, err := a.FromDb(tc.Context(), &pb.ExampleRequest{})
 	if err != nil {
 		t.Errorf("%s", err)
 	}
 
 	data := response.GetData()
-	if data != 6 {
-		t.Errorf("incorrect data, got: %d, want: %d", data, 6)
+	if data != 2 {
+		t.Errorf("incorrect data, got: %d, want: %d", data, 2)
 	}
 }
